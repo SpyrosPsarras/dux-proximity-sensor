@@ -1,0 +1,16 @@
+{
+  "id": "proximityLock",
+  "name": "Proximity Lock",
+  "description": "Locks the screen when your Bluetooth devices leave. Combine phones, watches and other devices into a rule with nested groups.",
+  "version": "0.1.0",
+  "author": "Spyros Psarras",
+  "icon": "phonelink_lock",
+  "type": "daemon",
+  "component": "./ProximityLock.qml",
+  "settings": "./ProximityLockSettings.qml",
+  "permissions": [
+    "settings_read",
+    "settings_write"
+  ],
+  "requires_dms": ">=2.0.0"
+}
