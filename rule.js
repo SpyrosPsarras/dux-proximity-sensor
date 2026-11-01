@@ -8,16 +8,22 @@ function device(address, name) {
     return { kind: "device", address: address.toUpperCase(), name: name || address, check: "connected", minSignal: -70 };
 }
 
+function wifi(ssid) {
+    return { kind: "wifi", ssid: ssid, name: ssid };
+}
+
 function isComplete(node) {
     if (!node)
         return false;
     if (node.kind === "device")
         return !!node.address;
+    if (node.kind === "wifi")
+        return !!node.ssid;
     return Array.isArray(node.items) && node.items.length > 0 && node.items.every(isComplete);
 }
 
 function devices(node) {
-    if (!node)
+    if (!node || node.kind === "wifi")
         return [];
     if (node.kind === "device")
         return [node];
@@ -25,7 +31,7 @@ function devices(node) {
 }
 
 function isMet(node, isNear) {
-    if (node.kind === "device")
+    if (node.kind !== "group")
         return isNear(node);
     const count = node.items.filter(item => isMet(item, isNear)).length;
     if (node.need === "all")
@@ -35,8 +41,10 @@ function isMet(node, isNear) {
     return count > 0;
 }
 
-// live.connected: address -> true; live.samples: address -> [[ms, rssi], ...]
+// live.connected: address -> true; live.samples: address -> [[ms, rssi], ...]; live.wifi: SSID of the connected Wi-Fi, or ""
 function isNear(node, live, now, timeoutMs) {
+    if (node.kind === "wifi")
+        return !!live.wifi && live.wifi === node.ssid;
     if (node.check === "signal")
         return strongestSignal(node.address, live, now, timeoutMs) >= node.minSignal;
     return (live.connected || {})[node.address] === true;

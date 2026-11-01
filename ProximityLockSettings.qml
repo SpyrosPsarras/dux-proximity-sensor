@@ -17,6 +17,11 @@ PluginSettings {
         return named.sort((a, b) => (b.paired - a.paired) || a.name.localeCompare(b.name));
     }
     readonly property var deviceLabels: knownDevices.map(deviceLabel)
+    readonly property var wifiNames: {
+        const current = NetworkService.wifiConnected ? [NetworkService.currentWifiSSID] : [];
+        const saved = (NetworkService.savedWifiNetworks ?? []).map(n => n.ssid);
+        return [...new Set(current.concat(saved))].filter(ssid => !!ssid);
+    }
 
     function tr(text) {
         return I18n.trFor(pluginId, text);
@@ -47,6 +52,15 @@ PluginSettings {
         }));
     }
 
+    function addWifi(path, ssid) {
+        const group = Rule.nodeAt(rule, path);
+        if (!ssid || group.items.some(item => item.kind === "wifi" && item.ssid === ssid))
+            return;
+        edit(path, Object.assign({}, group, {
+            "items": group.items.concat([Rule.wifi(ssid)])
+        }));
+    }
+
     function addGroup(path) {
         const group = Rule.nodeAt(rule, path);
         edit(path, Object.assign({}, group, {
@@ -55,6 +69,8 @@ PluginSettings {
     }
 
     function nearNow(node) {
+        if (node.kind === "wifi")
+            return !!live && Rule.isNear(node, live, 0, 0);
         return !!live && (node.check === "signal" ? strongest(node) >= node.minSignal : live.connected[node.address] === true);
     }
 
@@ -62,17 +78,30 @@ PluginSettings {
         return live?.strongest?.[node.address] ?? -Infinity;
     }
 
+    function hasWifi(node) {
+        return node?.kind === "wifi" || (node?.items ?? []).some(hasWifi);
+    }
+
     function met(node) {
         return Rule.isComplete(node) && Rule.isMet(node, nearNow);
     }
 
-    function iconFor(address) {
+    function iconFor(node) {
+        if (node.kind === "wifi")
+            return "wifi";
+        const address = node.address;
         const d = (BluetoothService.devices?.values ?? []).find(x => (x.address || "").toUpperCase() === address);
         return d ? BluetoothService.getDeviceIcon(d) : "bluetooth";
     }
 
     onPluginServiceChanged: loadRule()
-    Component.onCompleted: loadRule()
+    // The network service only keeps the saved-network list up to date while something holds a reference.
+    Component.onCompleted: {
+        loadRule();
+        NetworkService.addRef();
+        Qt.callLater(() => NetworkService.refreshSavedWifiNetworks());
+    }
+    Component.onDestruction: NetworkService.removeRef()
 
     StyledText {
         width: parent.width
@@ -85,7 +114,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: root.tr("Build a rule from your Bluetooth devices. While the rule is met you count as nearby and the screen stays unlocked. When it stops being met, the screen locks. It never unlocks the screen.")
+        text: root.tr("Build a rule from your Bluetooth devices and Wi-Fi networks. While the rule is met you count as nearby and the screen stays unlocked. When it stops being met, the screen locks. It never unlocks the screen.")
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
@@ -94,7 +123,7 @@ PluginSettings {
     StyledRect {
         id: banner
         readonly property string state: {
-            if (!BluetoothService.enabled)
+            if (!BluetoothService.enabled && !root.hasWifi(root.rule))
                 return "off";
             if (!root.live)
                 return "stopped";
@@ -139,9 +168,9 @@ PluginSettings {
                 font.pixelSize: Theme.fontSizeMedium
                 color: banner.state === "near" ? Theme.onPrimaryContainer : banner.state === "locking" ? Theme.onErrorContainer : Theme.surfaceText
                 text: ({
-                        "off": root.tr("Bluetooth is off. Every device counts as away."),
+                        "off": root.tr("Bluetooth is off. Every Bluetooth device counts as away."),
                         "stopped": root.tr("The plugin isn't running. Turn it on to see live status."),
-                        "incomplete": root.tr("Add at least one device. A group with nothing in it pauses the rule."),
+                        "incomplete": root.tr("Add at least one device or Wi-Fi network. A group with nothing in it pauses the rule."),
                         "near": root.tr("You count as nearby. The screen stays unlocked."),
                         "locking": root.tr("You count as away. Locking in %1 s.").arg(banner.secondsLeft),
                         "waiting": root.tr("You count as away. The screen won't lock until the rule has been met once.")

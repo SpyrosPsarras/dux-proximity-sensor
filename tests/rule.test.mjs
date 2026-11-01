@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync(new URL("../rule.js", import.meta.url), "utf8").replace(".pragma library", "");
-const Rule = new Function(source + "\nreturn { group, device, isComplete, devices, isMet, isNear, strongestSignal, prune, nodeAt, replaceAt };")();
+const Rule = new Function(source + "\nreturn { group, device, wifi, isComplete, devices, isMet, isNear, strongestSignal, prune, nodeAt, replaceAt };")();
 
 const phone = { ...Rule.device("aa:aa:aa:aa:aa:aa", "Phone") };
 const watch = { ...Rule.device("BB:BB:BB:BB:BB:BB", "Watch"), check: "signal", minSignal: -70 };
@@ -61,6 +61,25 @@ test("signal check needs a strong enough reading inside the timeout", () => {
     assert.equal(Rule.isNear(watch, live, 8000, 2000), false, "reading too old");
     assert.equal(Rule.isNear({ ...watch, minSignal: -60 }, live, 6000, 2000), false, "reading too weak");
     assert.equal(Rule.isNear(watch, { samples: {} }, 6000, 2000), false);
+});
+
+test("wifi counts as nearby only while connected to that SSID", () => {
+    const home = Rule.wifi("Home");
+    assert.equal(Rule.isNear(home, { wifi: "Home" }, 0, 1000), true);
+    assert.equal(Rule.isNear(home, { wifi: "home" }, 0, 1000), false, "SSIDs are case sensitive");
+    assert.equal(Rule.isNear(home, { wifi: "" }, 0, 1000), false);
+    assert.equal(Rule.isNear(home, {}, 0, 1000), false);
+    assert.equal(Rule.isNear(Rule.wifi(""), { wifi: "" }, 0, 1000), false, "an empty SSID never matches");
+});
+
+test("wifi mixes with devices in a rule and is not a Bluetooth device", () => {
+    const home = Rule.wifi("Home");
+    const rule = groupOf("any", home, groupOf("all", phone, watch));
+    assert.equal(Rule.isComplete(rule), true);
+    assert.equal(Rule.isComplete(groupOf("any", Rule.wifi(""))), false);
+    assert.equal(Rule.isMet(rule, near("Home")), true);
+    assert.equal(Rule.isMet(rule, near("Phone")), false);
+    assert.deepEqual(Rule.devices(rule).map(d => d.name), ["Phone", "Watch"]);
 });
 
 test("prune drops old readings and empty devices", () => {

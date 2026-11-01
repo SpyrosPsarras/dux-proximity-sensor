@@ -52,7 +52,9 @@ PluginComponent {
         samples = Rule.prune(samples, now, timeoutMs);
         const live = {
             connected: connectedMap(),
-            samples: samples
+            samples: samples,
+            // The SSID goes stale when the backend drops, and a hotspot can report its own name: count both as away.
+            wifi: DMSService.isConnected && NetworkService.wifiConnected && !NetworkService.hotspotEnabled ? NetworkService.currentWifiSSID : ""
         };
         met = ready && Rule.isMet(rule, node => Rule.isNear(node, live, now, timeoutMs));
 
@@ -80,6 +82,7 @@ PluginComponent {
             strongest[address] = Rule.strongestSignal(address, live, now, timeoutMs);
         const status = {
             "connected": live.connected,
+            "wifi": live.wifi,
             "strongest": strongest,
             "ready": ready,
             "met": met,

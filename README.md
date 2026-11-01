@@ -2,13 +2,13 @@
 
 # Proximity Lock
 
-A [Dux Shell](https://github.com/duxlabs-dev/dux-shell) daemon plugin that locks the screen when your Bluetooth devices leave. It never unlocks.
+A [Dux Shell](https://github.com/duxlabs-dev/dux-shell) daemon plugin that locks the screen when your Bluetooth devices leave, or when you leave a Wi-Fi network. It never unlocks.
 
-You build a rule from your devices in the plugin settings. While the rule is met you count as nearby. When it stops being met for the "Wait before locking" time, the shell locks the screen.
+You build a rule from your devices and Wi-Fi networks in the plugin settings. While the rule is met you count as nearby. When it stops being met for the "Wait before locking" time, the shell locks the screen.
 
 ## Rules
 
-A rule is a group. Each group holds devices and other groups, nested as deep as you like, and asks for one of:
+A rule is a group. Each group holds devices, Wi-Fi networks and other groups, nested as deep as you like, and asks for one of:
 
 | In the settings | Met when |
 |---|---|
@@ -31,9 +31,24 @@ Each device uses one check:
 
 Phones that rotate their Bluetooth address show up under a new address unless they are bonded with this computer. Pick the device from the paired list when you can.
 
+## Wi-Fi networks
+
+A Wi-Fi network counts as nearby while this computer is connected to it, matched by its exact name (SSID). The list offers your saved networks and the one you're connected to.
+
+Example: "Any of these: Home Wi-Fi, Phone (Bluetooth)" stays unlocked at home, and elsewhere only while the phone is connected.
+
+A network name proves nothing on its own: anyone can run an access point with the same name. How much that matters depends on the network's security:
+
+- **WPA2/WPA3-Personal:** an impostor needs the password. Anyone who knows it, such as guests or coworkers on a shared password, can imitate the network.
+- **WPA2/WPA3-Enterprise:** an impostor is kept out only if the connection profile checks the server certificate and its domain. A name shared across many sites, such as eduroam, counts as nearby at every one of them.
+- **Open:** no protection. Avoid adding open networks.
+
+Wi-Fi counts as away while it reconnects, while this computer runs a hotspot, and while the shell's backend is restarting. If the network is what keeps the rule met, a drop longer than "Wait before locking" locks the screen.
+
 ## Requirements
 
 - Dux Shell 2.0 or newer, with the `dbus` backend capability.
+- For Wi-Fi networks, the shell's network service must be running.
 - BlueZ. The signal check uses `org.bluez.Adapter1` discovery with a filter, so BlueZ reports RSSI for every advertisement instead of only changes of 8 dBm or more.
 
 ## Install for development

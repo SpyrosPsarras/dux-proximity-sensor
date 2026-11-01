@@ -20,6 +20,7 @@ StyledRect {
     readonly property bool met: editor.met(node)
     readonly property var needs: ["all", "any", "one"]
     readonly property string addDeviceText: editor.tr("Add a device")
+    readonly property string addWifiText: editor.tr("Add a Wi-Fi network")
 
     height: content.implicitHeight + Theme.spacingM * 2
     radius: Theme.cornerRadius
@@ -52,6 +53,7 @@ StyledRect {
         required property var editor
         readonly property var node: Rule.nodeAt(editor.rule, path) ?? Rule.device("", "")
         readonly property bool near: editor.nearNow(node)
+        readonly property bool isWifi: node.kind === "wifi"
         readonly property bool bySignal: node.check === "signal"
         readonly property real strongest: editor.strongest(node)
         readonly property var checks: ["connected", "signal"]
@@ -78,7 +80,7 @@ StyledRect {
 
                 DIcon {
                     id: deviceIcon
-                    name: row.editor.iconFor(row.node.address)
+                    name: row.editor.iconFor(row.node)
                     size: Theme.iconSize
                     color: row.near ? Theme.primary : Theme.surfaceVariantText
                     anchors.verticalCenter: parent.verticalCenter
@@ -106,6 +108,8 @@ StyledRect {
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         text: {
+                            if (row.isWifi)
+                                return row.near ? row.editor.tr("Connected to this Wi-Fi network") : row.editor.tr("Not connected to this Wi-Fi network");
                             if (!row.bySignal)
                                 return row.near ? row.editor.tr("Connected") : row.editor.tr("Not connected");
                             if (row.strongest === -Infinity)
@@ -130,7 +134,7 @@ StyledRect {
 
                     DActionButton {
                         iconName: "close"
-                        tooltipText: row.editor.tr("Remove this device")
+                        tooltipText: row.isWifi ? row.editor.tr("Remove this network") : row.editor.tr("Remove this device")
                         onClicked: row.editor.edit(row.path, null)
                     }
                 }
@@ -139,6 +143,7 @@ StyledRect {
             Item {
                 width: parent.width
                 height: checkDropdown.height
+                visible: !row.isWifi
 
                 StyledText {
                     anchors.left: parent.left
@@ -153,7 +158,7 @@ StyledRect {
                     anchors.right: parent.right
                     dropdownWidth: 220
                     options: row.checkLabels
-                    currentValue: row.checkLabels[row.checks.indexOf(row.node.check)]
+                    currentValue: row.checkLabels[row.checks.indexOf(row.node.check)] ?? ""
                     onValueChanged: value => row.update({
                             "check": row.checks[row.checkLabels.indexOf(value)]
                         })
@@ -165,7 +170,7 @@ StyledRect {
                 visible: row.bySignal
                 minimum: -100
                 maximum: -30
-                value: row.node.minSignal
+                value: row.node.minSignal ?? -70
                 unit: "dBm"
                 startIcon: "signal_cellular_1_bar"
                 endIcon: "signal_cellular_4_bar"
@@ -254,7 +259,7 @@ StyledRect {
             color: Theme.surfaceVariantText
             text: {
                 if (group.empty)
-                    return group.editor.tr("Add a device or a group. An empty group pauses the whole rule.");
+                    return group.editor.tr("Add a device, a Wi-Fi network or a group. An empty group pauses the whole rule.");
                 if (group.node.need === "all")
                     return group.editor.tr("Every item below must count as nearby.");
                 if (group.node.need === "one")
@@ -292,7 +297,8 @@ StyledRect {
             }
         }
 
-        Row {
+        Flow {
+            width: parent.width
             spacing: Theme.spacingS
 
             DDropdown {
@@ -303,6 +309,17 @@ StyledRect {
                 onValueChanged: value => {
                     group.editor.addDevice(group.where, value);
                     currentValue = group.addDeviceText;
+                }
+            }
+
+            DDropdown {
+                dropdownWidth: 260
+                options: group.editor.wifiNames
+                emptyText: group.editor.tr("No saved Wi-Fi networks")
+                currentValue: group.addWifiText
+                onValueChanged: value => {
+                    group.editor.addWifi(group.where, value);
+                    currentValue = group.addWifiText;
                 }
             }
 
